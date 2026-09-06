@@ -1,0 +1,35 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Acme GraphQL schema standards update policy. Composable: contains only packageRules for @acme/eslint-plugin-graphql, so it can be extended alongside a repo's existing Renovate config.",
+  "packageRules": [
+    {
+      "description": "In-range minors and patches only ever ADD rules as warnings, so they cannot turn a green build red. Safe to merge unattended. rangeStrategy update-lockfile keeps package.json at ^1.x and moves only the lockfile, matching what `npm run update-rules` does by hand.",
+      "matchPackageNames": ["@acme/eslint-plugin-graphql"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "rangeStrategy": "update-lockfile",
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": true,
+      "schedule": ["before 9am on monday"],
+      "addLabels": ["graphql-standards"],
+      "commitMessageTopic": "Acme GraphQL standards"
+    },
+    {
+      "description": "Majors promote pending rules from warn to error and WILL fail builds that have outstanding warnings. Always requires a human.",
+      "matchPackageNames": ["@acme/eslint-plugin-graphql"],
+      "matchUpdateTypes": ["major"],
+      "rangeStrategy": "bump",
+      "automerge": false,
+      "prPriority": 10,
+      "addLabels": ["graphql-standards", "breaking"],
+      "commitMessageTopic": "Acme GraphQL standards (MAJOR)",
+      "prBodyNotes": [
+        "⚠️ **This major promotes pending rules from `warn` to `error`.**",
+        "",
+        "Before merging, run `cd .lint && npm run lint` and clear any remaining warnings — they become build failures on merge.",
+        "",
+        "See the rule reference in `@acme/eslint-plugin-graphql` for which rules were promoted."
+      ]
+    }
+  ]
+}

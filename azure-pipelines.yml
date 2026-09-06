@@ -1,0 +1,118 @@
+# CI and release for @acme/eslint-plugin-graphql.
+#
+# Pull requests and main   -> install + test.
+# Tags matching v*         -> install + test + publish to Artifactory.
+#
+# Required pipeline variable (mark as secret):
+#   ARTIFACTORY_NPM_TOKEN   JFrog identity or reference token with deploy
+#                           permission on npm-local.
+
+trigger:
+  branches:
+    include:
+      - main
+  tags:
+    include:
+      - v*
+
+pr:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  NODE_VERSION: '22.x'
+  ARTIFACTORY_HOST: acme.jfrog.io
+  # Resolve through the virtual repo (proxies npmjs.org + hosts Acme packages).
+  RESOLVE_REGISTRY: https://acme.jfrog.io/artifactory/api/npm/npm-virtual/
+  # Publish into the local repo that the virtual repo aggregates.
+  PUBLISH_REGISTRY: https://acme.jfrog.io/artifactory/api/npm/npm-local/
+
+stages:
+  - stage: verify
+    displayName: Verify
+    jobs:
+      - job: test
+        displayName: Install and test
+        steps:
+          - task: NodeTool@0
+            displayName: Use Node $(NODE_VERSION)
+            inputs:
+              versionSpec: $(NODE_VERSION)
+
+          - script: |
+              set -euo pipefail
+              cat > .npmrc <<NPMRC
+              registry=$(RESOLVE_REGISTRY)
+              //$(ARTIFACTORY_HOST)/artifactory/api/npm/npm-virtual/:_authToken=${ARTIFACTORY_NPM_TOKEN}
+              //$(ARTIFACTORY_HOST)/artifactory/api/npm/npm-local/:_authToken=${ARTIFACTORY_NPM_TOKEN}
+              always-auth=true
+              NPMRC
+            displayName: Authenticate to Artifactory
+            env:
+              # Mapped through env so the token is never expanded into the log.
+              ARTIFACTORY_NPM_TOKEN: $(ARTIFACTORY_NPM_TOKEN)
+
+          - script: npm ci
+            displayName: npm ci
+
+          - script: npm test
+            displayName: npm test
+
+          # Catches a rule added to rules/ but never registered in lib/manifest.js,
+          # and any pending rule missing its promotion target.
+          - script: npm pack --dry-run
+            displayName: Verify package contents
+
+  - stage: publish
+    displayName: Publish
+    dependsOn: verify
+    condition: >-
+      and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'))
+    jobs:
+      - job: publish
+        displayName: Publish to Artifactory
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(NODE_VERSION)
+
+          - script: |
+              set -euo pipefail
+              cat > .npmrc <<NPMRC
+              registry=$(RESOLVE_REGISTRY)
+              //$(ARTIFACTORY_HOST)/artifactory/api/npm/npm-virtual/:_authToken=${ARTIFACTORY_NPM_TOKEN}
+              //$(ARTIFACTORY_HOST)/artifactory/api/npm/npm-local/:_authToken=${ARTIFACTORY_NPM_TOKEN}
+              always-auth=true
+              NPMRC
+            displayName: Authenticate to Artifactory
+            env:
+              ARTIFACTORY_NPM_TOKEN: $(ARTIFACTORY_NPM_TOKEN)
+
+          - script: |
+              set -euo pipefail
+              PKG_VERSION=$(node -p "require('./package.json').version")
+              TAG_VERSION="${BUILD_SOURCEBRANCH#refs/tags/v}"
+              if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+                echo "package.json version ($PKG_VERSION) does not match tag ($TAG_VERSION)."
+                echo "Use 'npm version <minor|major>' so the two stay in step."
+                exit 1
+              fi
+              echo "Publishing $PKG_VERSION"
+            displayName: Check tag matches package version
+            env:
+              BUILD_SOURCEBRANCH: $(Build.SourceBranch)
+
+          - script: npm ci
+            displayName: npm ci
+
+          - script: npm test
+            displayName: npm test
+
+          - script: npm publish --registry $(PUBLISH_REGISTRY)
+            displayName: npm publish
+            env:
+              ARTIFACTORY_NPM_TOKEN: $(ARTIFACTORY_NPM_TOKEN)

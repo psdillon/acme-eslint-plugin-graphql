@@ -1,0 +1,43 @@
+{
+  "name": "@acme/eslint-plugin-graphql",
+  "version": "1.0.0",
+  "description": "Acme GraphQL schema standards, enforced as ESLint rules over .graphql SDL.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "bin/",
+    "lib/",
+    "rules/",
+    "README.md",
+    "README-DEVS.md"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@graphql-eslint/eslint-plugin": "^4.4.0",
+    "@microsoft/eslint-formatter-sarif": "^3.1.0",
+    "eslint": "^9.30.0",
+    "graphql": "^16.9.0"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0"
+  },
+  "publishConfig": {
+    "registry": "https://acme.jfrog.io/artifactory/api/npm/npm-local/"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "license": "UNLICENSED",
+  "private": false,
+  "bin": {
+    "eslint-plugin-graphql": "./bin/init.js",
+    "acme-graphql-lint": "./bin/init.js"
+  }
+}
