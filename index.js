@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import graphql from '@graphql-eslint/eslint-plugin';
 import { rules } from './rules/index.js';
-import { RULES, PENDING_RULE_IDS } from './lib/manifest.js';
+import { RULES, PENDING_RULE_IDS, ADVISORY_RULE_IDS } from './lib/manifest.js';
 
 const { version } = createRequire(import.meta.url)('./package.json');
 
@@ -15,12 +15,17 @@ const plugin = {
 
 /**
  * Turns the manifest into an ESLint rules record.
- * `pending` rules are downgraded to warnings unless `strict` is requested.
+ *
+ * `pending` rules are warnings until `strict` promotes them, which is how a
+ * team checks whether it is ready for the next major. `advisory` rules are
+ * warnings under every setting: they have legitimate exceptions, so promoting
+ * them would only produce failures a human has to override.
  */
 function toRulesRecord(strict) {
   return Object.fromEntries(
     RULES.map(({ id, status, options }) => {
-      const severity = strict || status === 'enforced' ? 'error' : 'warn';
+      const enforced = status === 'enforced' || (strict && status === 'pending');
+      const severity = enforced ? 'error' : 'warn';
       return [id, options.length ? [severity, ...options] : severity];
     }),
   );
@@ -69,5 +74,5 @@ export function acmeGraphQL({ schema, files = ['**/*.graphql'], strict = false }
   ];
 }
 
-export { PENDING_RULE_IDS, RULES };
+export { ADVISORY_RULE_IDS, PENDING_RULE_IDS, RULES };
 export default plugin;

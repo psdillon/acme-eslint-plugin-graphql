@@ -1,0 +1,9 @@
+{
+  "eslint.validate": [
+    "graphql"
+  ],
+  "eslint.nodePath": ".lint/node_modules",
+  "eslint.options": {
+    "overrideConfigFile": ".lint/eslint.config.mjs"
+  }
+}

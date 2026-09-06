@@ -5,7 +5,8 @@
   "type": "module",
   "main": "index.js",
   "exports": {
-    ".": "./index.js"
+    ".": "./index.js",
+    "./lint": "./lib/lint.js"
   },
   "files": [
     "index.js",
@@ -40,8 +41,7 @@
   "license": "UNLICENSED",
   "private": false,
   "bin": {
-    "eslint-plugin-graphql": "./bin/init.js",
-    "acme-graphql-lint": "./bin/init.js"
+    "graphql-lint": "./bin/cli.js"
   },
   "devDependencies": {
     "jest": "^30.5.1"

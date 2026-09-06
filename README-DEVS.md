@@ -11,6 +11,43 @@ curl -u you@acme.com.au:<identity-token> \
 
 Paste the output into `C:\Users\<you>\.npmrc` (Windows) or `~/.npmrc`.
 
+## Quick check: lint a file without setting anything up
+
+If you just want a verdict on some SDL, skip the setup below:
+
+```bash
+npx @acme/eslint-plugin-graphql lint schema/user.graphql   # one file
+npx @acme/eslint-plugin-graphql lint "schema/**/*.graphql" # a glob
+npx @acme/eslint-plugin-graphql lint schema/               # a directory
+npx @acme/eslint-plugin-graphql lint                       # everything below here
+```
+
+Paths are relative to the directory you run it from — including paths above it,
+like `../other-service/schema.graphql`. No `.lint/`, no config file.
+Errors exit 1, warnings exit 0.
+
+Linting one file of a multi-file schema? Point `--schema` at all of it, or rules
+that resolve types across files will only see the one file:
+
+```bash
+npx @acme/eslint-plugin-graphql lint schema/user.graphql --schema="schema/**/*.graphql"
+```
+
+Other flags: `--strict` (pending rules become errors), `--fix`, `--quiet`,
+`--max-warnings=<n>`, `--format=<name>`, `--output-file=<path>`.
+
+Installing the package (globally, or as a dev dependency) gives you the same
+thing as `graphql-lint`, without the `npx` prefix:
+
+```bash
+graphql-lint lint schema/user.graphql
+```
+
+The setup below is still worth doing for any repo that lints routinely — it pins
+the version, wires up both editors, and gives CI a lockfile.
+
+---
+
 ## 2. Set up the repo (once per repo)
 
 From your repository root:
@@ -107,6 +144,13 @@ cd .. && ./.lint/node_modules/.bin/eslint \
   --config .lint/eslint.config.mjs "**/*.graphql" \
   --format ./.lint/node_modules/@microsoft/eslint-formatter-sarif/sarif.js \
   --output-file .lint/eslint.sarif
+```
+
+Without a committed `.lint/`, the CLI does the same in one step:
+
+```bash
+npx @acme/eslint-plugin-graphql lint "**/*.graphql" \
+  --format=@microsoft/eslint-formatter-sarif --output-file=eslint.sarif
 ```
 
 Do not add `--max-warnings 0`.

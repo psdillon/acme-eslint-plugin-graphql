@@ -13,6 +13,11 @@ describe('manifest', () => {
     expect(declared.sort()).toEqual(Object.keys(rules).sort());
   });
 
+  it('gives every rule a known status', () => {
+    const statuses = [...new Set(RULES.map(r => r.status))].sort();
+    expect(statuses.every(s => ['advisory', 'enforced', 'pending'].includes(s))).toBe(true);
+  });
+
   it('gives every pending rule a promotion target', () => {
     const pending = RULES.filter(r => r.status === 'pending');
     // Compared id-by-id so a failure names the rule that is missing a target.
@@ -21,15 +26,23 @@ describe('manifest', () => {
     );
   });
 
-  it('reports pending rules as warnings and enforced rules as errors', () => {
+  it('leaves advisory rules without a promotion target', () => {
+    const advisory = RULES.filter(r => r.status === 'advisory');
+    // An enforcedIn on an advisory rule means someone meant it to be pending.
+    expect(advisory.filter(r => r.enforcedIn).map(r => r.id)).toEqual([]);
+  });
+
+  it('reports enforced rules as errors and the rest as warnings', () => {
     const [{ rules: applied }] = acmeGraphQL({ schema: '/tmp/s.graphql' });
     expect(RULES.map(({ id }) => [id, severityOf(applied[id])])).toEqual(
-      RULES.map(({ id, status }) => [id, status === 'pending' ? 'warn' : 'error']),
+      RULES.map(({ id, status }) => [id, status === 'enforced' ? 'error' : 'warn']),
     );
   });
 
-  it('reports everything as an error under strict', () => {
+  it('promotes pending rules under strict, but not advisory ones', () => {
     const [{ rules: applied }] = acmeGraphQL({ schema: '/tmp/s.graphql', strict: true });
-    expect(RULES.map(({ id }) => [id, severityOf(applied[id])])).toEqual(RULES.map(({ id }) => [id, 'error']));
+    expect(RULES.map(({ id }) => [id, severityOf(applied[id])])).toEqual(
+      RULES.map(({ id, status }) => [id, status === 'advisory' ? 'warn' : 'error']),
+    );
   });
 });

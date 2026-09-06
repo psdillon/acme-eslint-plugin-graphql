@@ -41,6 +41,85 @@ this single registry serves `eslint` and `@acme/*` alike.
 
 ---
 
+## CLI
+
+One bin, `graphql-lint`, resolving to [`bin/cli.js`](bin/cli.js), which dispatches
+on the first argument. Because it is the package's only bin, `npx` runs it
+without the name having to match the package.
+
+```bash
+npx @acme/eslint-plugin-graphql lint schema/user.graphql   # no install
+graphql-lint lint schema/user.graphql                      # installed or linked
+```
+
+### `lint` — check files directly
+
+```bash
+npx @acme/eslint-plugin-graphql lint schema/user.graphql
+npx @acme/eslint-plugin-graphql lint "schema/**/*.graphql"
+npx @acme/eslint-plugin-graphql lint schema/
+npx @acme/eslint-plugin-graphql lint            # defaults to **/*.graphql
+```
+
+No config file, no `.lint/` directory. Paths resolve from the current directory
+and may point anywhere, including above it (`lint ../other-repo/schema.graphql`).
+Any `eslint.config.*` in the tree is ignored — the CLI *is* the config.
+
+> ESLint ignores files above its base path, so the CLI sets that base to the
+> deepest directory containing every target. Without it, `lint ../schema.graphql`
+> reports *"File ignored because outside of base path"* and exits 0.
+
+| Flag | Effect |
+| --- | --- |
+| `--schema=<glob>` | SDL that forms the schema, when it is wider than the files being linted. |
+| `--strict` | Treat `pending` rules as errors, not warnings. |
+| `--fix` | Apply fixes in place. |
+| `--quiet` | Report errors only. |
+| `--max-warnings=<n>` | Exit non-zero above `n` warnings. |
+| `--format=<name>` | ESLint formatter. Default `stylish`. |
+| `--output-file=<path>` | Write the report to a file instead of stdout. |
+
+Exit code is 1 if there are errors, 0 if there are only warnings — the same
+contract as `eslint`, so it gates a build without further arguments.
+
+After the report, it says what the warnings mean:
+
+```
+1 warning becomes an error in 2.0.0.
+2 advisory warnings: guidance with legitimate exceptions, which will never fail a build.
+```
+
+Both lines go to **stderr**, so they never contaminate `--format=json` or a
+redirect into a file.
+
+**`--schema` matters when a schema spans several files.** Rules like
+`require-mutation-payload` resolve types across the whole schema; linting one
+file in isolation gives it only that file's types:
+
+```bash
+# Lints just user.graphql, but resolves types against the full schema.
+npx @acme/eslint-plugin-graphql lint schema/user.graphql --schema="schema/**/*.graphql"
+```
+
+### `init` — scaffold a repo
+
+```bash
+npx @acme/eslint-plugin-graphql init
+```
+
+Writes `.lint/` plus editor settings and installs. See
+**Setup: .NET project** below. Flags: `--schema=<glob>`, `--force`,
+`--no-install`, `--no-vscode`, `--no-idea`.
+
+### Which one to use
+
+`init` is for a repo that lints its schema routinely: it pins the version in
+`.lint/package.json`, wires both editors, and gives CI a lockfile. `lint` is for
+everything else — a one-off check, a scratch schema, a pipeline that would rather
+run one command than maintain a committed `.lint/` directory.
+
+---
+
 ## Setup: JavaScript / TypeScript project
 
 Your repo already has a `package.json` and `node_modules`, so install directly.
@@ -209,6 +288,14 @@ cd .. && ./.lint/node_modules/.bin/eslint \
   --output-file .lint/eslint.sarif
 ```
 
+A repo without a committed `.lint/` can run the CLI instead, which needs no
+config file and resolves the SARIF formatter itself:
+
+```bash
+npx @acme/eslint-plugin-graphql lint "**/*.graphql" \
+  --format=@microsoft/eslint-formatter-sarif --output-file=eslint.sarif
+```
+
 `npm ci` installs exactly the lockfile — no drift between developer and agent.
 SARIF is understood by both Azure DevOps and GitHub, which render violations as
 inline annotations on the PR diff, preserving the warning/error distinction.
@@ -229,9 +316,19 @@ Errors already exit non-zero, so the gate works without it.
 
 ## Adding a new rule
 
-**Every new rule enters as a warning and only becomes an error in a major
-release.** This is what makes minor bumps safe to auto-merge: a minor can never
-turn a green build red.
+**Every new rule enters as a warning.** This is what makes minor bumps safe to
+auto-merge: a minor can never turn a green build red.
+
+It stays a warning in one of two ways, and the choice is made when you add it:
+
+| status | Becomes an error | For |
+| --- | --- | --- |
+| `pending` | In the major named by `enforcedIn` | A standard on its way in. Teams fix the warnings before taking the major. |
+| `advisory` | Never, not even under `strict` | Guidance with legitimate exceptions, which a human has to weigh case by case. |
+
+Pick `advisory` when you can describe a case where violating the rule is the
+right call. If every violation is a defect given enough time to fix it, it is
+`pending`.
 
 ### 1. Write the rule
 
@@ -281,7 +378,7 @@ export const rules = {
 };
 ```
 
-### 3. Add it to the manifest as `pending`
+### 3. Add it to the manifest as `pending` or `advisory`
 
 `lib/manifest.js` is the single source of truth for severity:
 
@@ -295,8 +392,25 @@ export const rules = {
 },
 ```
 
-`status: 'pending'` is what downgrades it to a warning. Never add a rule
-directly as `enforced`.
+A rule with exceptions is advisory instead, and takes no promotion target —
+`since` records when it appeared, and there is no `enforcedIn` because it is
+never promoted:
+
+```js
+{
+  id: '@acme/prefer-connection-pagination',
+  status: 'advisory',       // -> `warn`, under every setting
+  since: '1.6.0',
+  options: [],
+},
+```
+
+`status` is what downgrades a rule to a warning. Never add a rule directly as
+`enforced`. The manifest test rejects an `advisory` rule that carries
+`enforcedIn`, since that combination means `pending` was intended.
+
+`PENDING_RULE_IDS` and `ADVISORY_RULE_IDS` are exported for tooling that needs
+to tell the two kinds of warning apart — the CLI uses them in its summary.
 
 ### 4. Test it
 
