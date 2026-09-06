@@ -16,8 +16,8 @@
     "README-DEVS.md"
   ],
   "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
   },
   "dependencies": {
     "@graphql-eslint/eslint-plugin": "^4.4.0",
@@ -25,13 +25,11 @@
     "eslint": "^10.10.0",
     "graphql": "^16.9.0"
   },
-  "devDependencies": {
-    "vitest": "^4.1.11"
-  },
   "overrides": {
     "@microsoft/eslint-formatter-sarif": {
       "eslint": "$eslint"
-    }
+    },
+    "test-exclude": "^8.0.0"
   },
   "publishConfig": {
     "registry": "https://acme.jfrog.io/artifactory/api/npm/npm-local/"
@@ -44,5 +42,8 @@
   "bin": {
     "eslint-plugin-graphql": "./bin/init.js",
     "acme-graphql-lint": "./bin/init.js"
+  },
+  "devDependencies": {
+    "jest": "^30.5.1"
   }
 }

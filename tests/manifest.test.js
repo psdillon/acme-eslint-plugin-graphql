@@ -1,7 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { acmeGraphQL } from '../index.js';
+import { describe, it, expect } from '@jest/globals';
+// RULES comes from the entry point, which re-exports the same binding as
+// lib/manifest.js. Importing it from both places at once trips Jest's ESM linker.
+import { acmeGraphQL, RULES } from '../index.js';
 import { rules } from '../rules/index.js';
-import { RULES } from '../lib/manifest.js';
+
+/** The severity half of a `[severity, ...options]` entry, or the bare severity. */
+const severityOf = entry => (Array.isArray(entry) ? entry[0] : entry);
 
 describe('manifest', () => {
   it('lists every Acme rule that exists', () => {
@@ -10,25 +14,22 @@ describe('manifest', () => {
   });
 
   it('gives every pending rule a promotion target', () => {
-    for (const rule of RULES.filter(r => r.status === 'pending')) {
-      expect(rule.enforcedIn, `${rule.id} must declare enforcedIn`).toMatch(/^\d+\.0\.0$/);
-      expect(rule.since, `${rule.id} must declare since`).toBeTruthy();
-    }
+    const pending = RULES.filter(r => r.status === 'pending');
+    // Compared id-by-id so a failure names the rule that is missing a target.
+    expect(pending.map(({ id, enforcedIn, since }) => ({ id, enforcedIn, hasSince: Boolean(since) }))).toEqual(
+      pending.map(({ id }) => ({ id, enforcedIn: expect.stringMatching(/^\d+\.0\.0$/), hasSince: true })),
+    );
   });
 
   it('reports pending rules as warnings and enforced rules as errors', () => {
     const [{ rules: applied }] = acmeGraphQL({ schema: '/tmp/s.graphql' });
-    for (const { id, status } of RULES) {
-      const severity = Array.isArray(applied[id]) ? applied[id][0] : applied[id];
-      expect(severity, id).toBe(status === 'pending' ? 'warn' : 'error');
-    }
+    expect(RULES.map(({ id }) => [id, severityOf(applied[id])])).toEqual(
+      RULES.map(({ id, status }) => [id, status === 'pending' ? 'warn' : 'error']),
+    );
   });
 
   it('reports everything as an error under strict', () => {
     const [{ rules: applied }] = acmeGraphQL({ schema: '/tmp/s.graphql', strict: true });
-    for (const { id } of RULES) {
-      const severity = Array.isArray(applied[id]) ? applied[id][0] : applied[id];
-      expect(severity, id).toBe('error');
-    }
+    expect(RULES.map(({ id }) => [id, severityOf(applied[id])])).toEqual(RULES.map(({ id }) => [id, 'error']));
   });
 });
