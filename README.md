@@ -18,7 +18,7 @@ toolchain moves with it.
 
 ## Requirements
 
-- **Node.js >= 20.11** on every developer machine and build agent. This is the
+- **Node.js >= 20.19** on every developer machine and build agent. This is the
   only prerequisite .NET teams do not already have.
 - Authentication to the Acme Artifactory npm registry (below, one-time per machine).
 

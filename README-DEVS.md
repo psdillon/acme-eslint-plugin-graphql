@@ -1,6 +1,6 @@
 # GraphQL schema linting — setup
 
-Requires Node.js >= 20.11.
+Requires Node.js >= 20.19.
 
 ## 1. Authenticate (once per machine)
 

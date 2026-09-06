@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { createRequire } from 'node:module';
 import { dirname, join, relative, sep } from 'node:path';
 
-const { version } = createRequire(import.meta.url)('../package.json');
+const { version, dependencies } = createRequire(import.meta.url)('../package.json');
 
 const REGISTRY = 'https://acme.jfrog.io/artifactory/api/npm/npm-virtual/';
 const PKG = '@acme/eslint-plugin-graphql';
@@ -102,6 +102,13 @@ write(
         'upgrade-rules': `npm install ${PKG}@latest && npm run lint`,
       },
       dependencies: { [PKG]: `^${version}` },
+      // @microsoft/eslint-formatter-sarif declares eslint ^8 but loads it with
+      // require.main.require('eslint'), i.e. the CLI's copy. Its own is never
+      // used and only drags a deprecated ESLint 8 tree into the install.
+      // Overrides apply from the root package, so this has to be repeated here.
+      overrides: {
+        '@microsoft/eslint-formatter-sarif': { eslint: dependencies.eslint },
+      },
     },
     null,
     2,
